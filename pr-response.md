@@ -108,22 +108,31 @@ Documented in the PR description below as well.
 
 ## Comment 5 — Sort order (date added vs alphabetical)
 
-**My position:** Agree with the maintainer — sort by **date added, newest first**
-(`WatchlistEntry.date_added.desc()`), matching `get_collection()`.
+**Decision:** Implement the maintainer's preference — sort by **date added,
+newest first** (`WatchlistEntry.date_added.desc()`), matching `get_collection()`.
 
-**Reasoning:** A watchlist is a queue of intent, not a reference catalog. Users
-usually ask "what did I just save / what should I watch next?" Newest-first
-answers that and also confirms a successful add (the new film appears at the top).
-Alphabetical helps locate a known title in a long list, but that is better solved
-with search/filter later than by making A–Z the global default. Consistency with
-`/collection` also matters so users do not hold two mental models of ordering.
+**User behavior I'm optimizing for:**
+The common watchlist loop is: save a film → later open the list to pick what to
+watch next (or confirm what you just queued). That is a **recency / queue**
+behavior, not a catalog lookup. Newest-first puts the film you just added at the
+top (immediate feedback that the save worked) and surfaces recent intent first
+when deciding "what's next?" It also matches how users already experience
+`/collection`, so switching between the two lists does not require a second
+mental model of ordering.
 
-**AI influence:** After drafting, I asked the AI what counterargument a careful
-reviewer would raise. It surfaced long-list findability for alphabetical sort.
-I kept newest-first and addressed findability as a search concern (not a reason
-to change the default). I considered `?sort=` and deferred it as premature.
+**Tradeoff of the other option (alphabetical):**
+Sorting by `Film.title.asc()` would make it easier to **find a known title** in a
+long list (scan to "B" for *Blade Runner*). We give that up as the default. For
+a growing watchlist, A–Z buries the film you just saved somewhere mid-alphabet
+and answers a less common question ("where is title X?") better than the more
+common one ("what did I add / what should I watch?"). Findability is still a
+real need — I treat it as a search/filter problem for a later iteration, not as
+a reason to keep alphabetical as the global default. A `?sort=title|date` query
+param would reclaim that option without changing the default; I deferred that as
+premature until we see demand.
 
-Implemented in `get_watchlist()` and covered by `test_get_watchlist_returns_newest_first`.
+**What I changed:** `get_watchlist()` now orders by `date_added` descending.
+Covered by `test_get_watchlist_returns_newest_first`.
 
 ---
 
