@@ -209,7 +209,7 @@ per commit, no merge commits (`git log --merges bbe206c..HEAD` is empty).
 
 ```
 $ git log --oneline bbe206c..HEAD
-cbce155 docs: add pr-response.md with review responses
+7788d6f docs: add pr-response.md with review responses
 16dcfd0 test: add watchlist service tests
 156599b feat: add watchlist service and API endpoints
 eb9b8ab feat: add WatchlistEntry model with UUID film ids
@@ -219,7 +219,7 @@ Full recent log (includes base commits from `main`):
 
 ```
 $ git log --oneline -8
-cbce155 docs: add pr-response.md with review responses
+7788d6f docs: add pr-response.md with review responses
 16dcfd0 test: add watchlist service tests
 156599b feat: add watchlist service and API endpoints
 eb9b8ab feat: add WatchlistEntry model with UUID film ids
