@@ -198,16 +198,18 @@ branch history remains linear with no merge commits.
 
 ## Git History (`git log --oneline`)
 
-Verified against Conventional Commits / `CONTRIBUTING.md`: each message uses a
-type prefix, imperative mood, and one logical change. No merge commits on the
-branch (`git log --merges bbe206c..HEAD` is empty).
+Rewritten with `git rebase -i bbe206c`:
+- **pick** — kept the two `feat:` commits and the `test:` commit unchanged
+- **reword** — renamed the docs commit message for clarity
+- **fixup** — folded later docs-only follow-ups (Comment 5/6 wording updates)
+  into that single docs commit
+
+Verified against Conventional Commits / `CONTRIBUTING.md`: one logical change
+per commit, no merge commits (`git log --merges bbe206c..HEAD` is empty).
 
 ```
 $ git log --oneline bbe206c..HEAD
-fe827ab docs: expand Comment 6 conflict resolution process
-529ee01 docs: document Comment 6 UUID rebase verification
-0acf911 docs: clarify Comment 5 sort-order rationale in pr-response
-27c142c docs: add pr-response.md with review responses
+7788d6f docs: add pr-response.md with review responses
 16dcfd0 test: add watchlist service tests
 156599b feat: add watchlist service and API endpoints
 eb9b8ab feat: add WatchlistEntry model with UUID film ids
@@ -216,16 +218,15 @@ eb9b8ab feat: add WatchlistEntry model with UUID film ids
 Full recent log (includes base commits from `main`):
 
 ```
-$ git log --oneline -9
-fe827ab docs: expand Comment 6 conflict resolution process
-529ee01 docs: document Comment 6 UUID rebase verification
-0acf911 docs: clarify Comment 5 sort-order rationale in pr-response
-27c142c docs: add pr-response.md with review responses
+$ git log --oneline -8
+7788d6f docs: add pr-response.md with review responses
 16dcfd0 test: add watchlist service tests
 156599b feat: add watchlist service and API endpoints
 eb9b8ab feat: add WatchlistEntry model with UUID film ids
 bbe206c Merge pull request #2 from ascherj/chore/add-gitignore
 718a9a8 chore: add .gitignore for generated files
+07ca580 refactor: migrate film IDs from integer to UUID
+014ae54 feat: initial CineLog API with film collection feature
 ```
 
 ---
