@@ -139,22 +139,31 @@ Covered by `test_get_watchlist_returns_newest_first`.
 ## Comment 6 — Rebase onto `main` after UUID film ID migration
 
 **What conflicted:**
-`feature/watchlist` still used integer `film_id`s while `main` migrated `Film.id`
-and `CollectionEntry.film_id` to UUIDs. Replaying the old branch onto `main`
-would also drop `WatchlistEntry` from `models.py` (the UUID refactor on `main`
-removed that class because it lived in the same region of the file).
+The original `feature/watchlist` code used **integer** film IDs
+(`Film.id` / `WatchlistEntry.film_id` as `db.Integer`, route body
+`{ "film_id": <int> }`, docstring `film_id (int)`). Meanwhile `main` had
+already merged `refactor: migrate film IDs from integer to UUID`. Replaying the
+old branch onto that `main` also dropped `WatchlistEntry` from `models.py`
+(the UUID refactor edited the same region of the file).
 
 **How I resolved it:**
-- Reset the branch onto current `main` and re-applied the watchlist feature on
-  top of the UUID models.
-- Re-added `WatchlistEntry` with `film_id = db.Column(db.String(36), ...)` and
-  relationships on `User` / `Film`.
-- Updated service/route docs and payloads to use UUID strings, not integers.
+1. Fetched the updated `main` (`git fetch origin main`).
+2. Rebased the feature branch onto the UUID-updated base
+   (`07ca580` / `bbe206c`) with `git rebase`, keeping a **linear** history —
+   I did **not** leave the branch tip on main's merge commit
+   (`Merge pull request #1...`), which would have reintroduced merge commits.
+3. Updated all watchlist code to UUID:
+   - `WatchlistEntry.film_id` → `db.String(36)` FK to `film.id`
+   - Service docs: `film_id (str): UUID of the film`
+   - Route body: `{ "film_id": "<uuid>" }`
+   - Tests use UUID fixtures / a fake UUID for the nonexistent-film case
 
-**How I verified:**
-- App imports cleanly; all tests pass with UUID fixtures.
-- `git log --merges origin/main..HEAD` is empty (linear history, no merges).
-- Branch tip sits on top of `origin/main`.
+**How I verified (no integer leftovers, no merge commits):**
+- `rg` over watchlist model/service/route/tests finds **no** `film_id (int)`,
+  `<int>`, or integer FK leftovers; `film_id` columns are `db.String(36)`.
+- `git merge-base --is-ancestor 07ca580 HEAD` → UUID refactor is an ancestor.
+- `git log --merges bbe206c..HEAD` → **empty** (no merge commits on the branch).
+- `pytest tests/ -v` passes with UUID-based fixtures.
 
 ---
 
@@ -162,11 +171,13 @@ removed that class because it lived in the same region of the file).
 
 Verified against Conventional Commits / `CONTRIBUTING.md`: each message uses a
 type prefix, imperative mood, and one logical change. No merge commits on the
-PR range (`git log --merges origin/main..HEAD` is empty).
+branch (`git log --merges bbe206c..HEAD` is empty).
 
 ```
-$ git log --oneline origin/main..HEAD
-7ca2951 docs: add pr-response.md with review responses
+$ git log --oneline bbe206c..HEAD
+3c899af docs: document Comment 6 UUID rebase verification
+0acf911 docs: clarify Comment 5 sort-order rationale in pr-response
+27c142c docs: add pr-response.md with review responses
 16dcfd0 test: add watchlist service tests
 156599b feat: add watchlist service and API endpoints
 eb9b8ab feat: add WatchlistEntry model with UUID film ids
@@ -176,13 +187,14 @@ Full recent log (includes base commits from `main`):
 
 ```
 $ git log --oneline -8
-7ca2951 docs: add pr-response.md with review responses
+3c899af docs: document Comment 6 UUID rebase verification
+0acf911 docs: clarify Comment 5 sort-order rationale in pr-response
+27c142c docs: add pr-response.md with review responses
 16dcfd0 test: add watchlist service tests
 156599b feat: add watchlist service and API endpoints
 eb9b8ab feat: add WatchlistEntry model with UUID film ids
 bbe206c Merge pull request #2 from ascherj/chore/add-gitignore
 718a9a8 chore: add .gitignore for generated files
-07ca580 refactor: migrate film IDs from integer to UUID
 ```
 
 ---
