@@ -138,32 +138,61 @@ Covered by `test_get_watchlist_returns_newest_first`.
 
 ## Comment 6 — Rebase onto `main` after UUID film ID migration
 
-**What conflicted:**
-The original `feature/watchlist` code used **integer** film IDs
-(`Film.id` / `WatchlistEntry.film_id` as `db.Integer`, route body
-`{ "film_id": <int> }`, docstring `film_id (int)`). Meanwhile `main` had
-already merged `refactor: migrate film IDs from integer to UUID`. Replaying the
-old branch onto that `main` also dropped `WatchlistEntry` from `models.py`
-(the UUID refactor edited the same region of the file).
+### What conflicted
 
-**How I resolved it:**
-1. Fetched the updated `main` (`git fetch origin main`).
-2. Rebased the feature branch onto the UUID-updated base
-   (`07ca580` / `bbe206c`) with `git rebase`, keeping a **linear** history —
-   I did **not** leave the branch tip on main's merge commit
-   (`Merge pull request #1...`), which would have reintroduced merge commits.
-3. Updated all watchlist code to UUID:
-   - `WatchlistEntry.film_id` → `db.String(36)` FK to `film.id`
-   - Service docs: `film_id (str): UUID of the film`
-   - Route body: `{ "film_id": "<uuid>" }`
-   - Tests use UUID fixtures / a fake UUID for the nonexistent-film case
+Two incompatible histories of film identity met during the rebase:
 
-**How I verified (no integer leftovers, no merge commits):**
-- `rg` over watchlist model/service/route/tests finds **no** `film_id (int)`,
-  `<int>`, or integer FK leftovers; `film_id` columns are `db.String(36)`.
-- `git merge-base --is-ancestor 07ca580 HEAD` → UUID refactor is an ancestor.
-- `git log --merges bbe206c..HEAD` → **empty** (no merge commits on the branch).
-- `pytest tests/ -v` passes with UUID-based fixtures.
+1. **Type mismatch (integer vs UUID).** The original `feature/watchlist` branch
+   treated film IDs as integers end-to-end:
+   - `Film.id = db.Column(db.Integer, ...)`
+   - `WatchlistEntry.film_id = db.Column(db.Integer, ForeignKey("film.id"))`
+   - `CollectionEntry.film_id` still integer on that branch tip
+   - Service docstring: `film_id (int)` with note `pre-refactor`
+   - Route contract: `Body: { "film_id": <int> }`
+   Meanwhile `main` already contained
+   `refactor: migrate film IDs from integer to UUID` (`07ca580`), so
+   `Film.id` / `CollectionEntry.film_id` on `main` were `db.String(36)`.
+
+2. **Silent model loss on rebase.** Replaying the feature branch onto UUID
+   `main` did not always surface a clean conflict marker in `models.py`. The
+   UUID refactor and the watchlist addition touched the same region of the
+   file; the auto-merge resolution could keep `main`'s version of that region
+   and **drop the entire `WatchlistEntry` class**. The service still did
+   `from models import WatchlistEntry`, so the conflict showed up as an
+   `ImportError` / broken app rather than an obvious merge conflict.
+
+### How I resolved it
+
+1. **Fetch updated main:** `git fetch origin main`.
+2. **Rebase onto the UUID base:** `git rebase` onto the post-UUID `main`
+   lineage (`07ca580` → `bbe206c`), keeping history **linear**. I explicitly
+   avoided leaving the branch tip on a merge commit from `main` (e.g.
+   `Merge pull request #1...`), which would have reintroduced merge commits.
+3. **Restore and migrate `WatchlistEntry`:** Re-added the model on top of
+   UUID `main` with:
+   - `film_id = db.Column(db.String(36), db.ForeignKey("film.id"))`
+   - `watchlist_entries` relationships on `User` and `Film`
+   - unique constraint on `(user_id, film_id)`
+4. **Update all call sites / docs to UUID:**
+   - `services/watchlist_service.py`: `film_id (str): UUID of the film`
+   - `routes/watchlist/watchlist.py`: `Body: { "film_id": "<uuid>" }`
+   - `tests/test_watchlist.py`: UUID fixtures; nonexistent case uses
+     `"00000000-0000-0000-0000-000000000000"`
+
+### How I confirmed the conflict was fully resolved
+
+| Check | Command / action | Expected result |
+| --- | --- | --- |
+| No integer film-ID leftovers | `rg 'film_id \\(int\\)\|<int\>|Integer.*ForeignKey\\("film' models.py services/watchlist_service.py routes/watchlist/ tests/test_watchlist.py` | No matches |
+| Model column type | Inspect `WatchlistEntry.film_id` in `models.py` | `db.String(36)` FK to `film.id` |
+| UUID refactor is in history | `git merge-base --is-ancestor 07ca580 HEAD` | Exit 0 (ancestor) |
+| No merge commits on branch | `git log --merges --oneline bbe206c..HEAD` | Empty |
+| App imports | `python -c "from app import create_app; create_app()"` | No `ImportError` for `WatchlistEntry` |
+| Behavior with UUIDs | `pytest tests/ -v` (incl. nonexistent-film UUID test) | All tests pass |
+
+All of the above passed. The integer/UUID conflict is fully resolved: watchlist
+code matches `main`'s UUID film IDs, `WatchlistEntry` is present, and the
+branch history remains linear with no merge commits.
 
 ---
 
@@ -175,7 +204,8 @@ branch (`git log --merges bbe206c..HEAD` is empty).
 
 ```
 $ git log --oneline bbe206c..HEAD
-3c899af docs: document Comment 6 UUID rebase verification
+fe827ab docs: expand Comment 6 conflict resolution process
+529ee01 docs: document Comment 6 UUID rebase verification
 0acf911 docs: clarify Comment 5 sort-order rationale in pr-response
 27c142c docs: add pr-response.md with review responses
 16dcfd0 test: add watchlist service tests
@@ -186,8 +216,9 @@ eb9b8ab feat: add WatchlistEntry model with UUID film ids
 Full recent log (includes base commits from `main`):
 
 ```
-$ git log --oneline -8
-3c899af docs: document Comment 6 UUID rebase verification
+$ git log --oneline -9
+fe827ab docs: expand Comment 6 conflict resolution process
+529ee01 docs: document Comment 6 UUID rebase verification
 0acf911 docs: clarify Comment 5 sort-order rationale in pr-response
 27c142c docs: add pr-response.md with review responses
 16dcfd0 test: add watchlist service tests
